@@ -1,0 +1,666 @@
+BOT FACTORY - Complete Technical Specification for Replit AI
+🎯 CORE PRODUCT VISION
+Bot Factory is a no-code, multi-platform bot builder that allows businesses to create, deploy, and manage automated conversation bots across WhatsApp, Telegram, Facebook Messenger, and Web Chat from a single visual dashboard.
+
+📊 ARCHITECTURE OVERVIEW
+text
+botfactory/
+├── backend/                    # Node.js + Express API
+│   ├── src/
+│   │   ├── controllers/       # Business logic
+│   │   ├── routes/           # API endpoints
+│   │   ├── models/           # MongoDB schemas
+│   │   ├── middleware/       # Auth, validation
+│   │   ├── services/         # Platform integrations
+│   │   └── config/           # Database, env
+│   └── package.json
+├── frontend/                  # React + React Flow
+│   ├── src/
+│   │   ├── components/       # Reusable UI
+│   │   ├── pages/           # Route pages
+│   │   ├── context/         # React Context
+│   │   ├── hooks/           # Custom hooks
+│   │   └── services/        # API calls
+│   └── package.json
+└── docker-compose.yml        # For MongoDB
+🔧 EXACT TECHNICAL STACK
+BACKEND (Node.js + Express)
+json
+{
+  "express": "^4.18.2",
+  "mongoose": "^7.0.0",
+  "jsonwebtoken": "^9.0.0",
+  "bcryptjs": "^2.4.3",
+  "cors": "^2.8.5",
+  "dotenv": "^16.0.3",
+  "socket.io": "^4.6.0",
+  "axios": "^1.3.0",
+  "express-validator": "^7.0.1",
+  "multer": "^1.4.5",
+  "whatsapp-web.js": "^1.21.0",
+  "node-telegram-bot-api": "^0.61.0"
+}
+FRONTEND (React)
+json
+{
+  "react": "^18.2.0",
+  "react-dom": "^18.2.0",
+  "react-router-dom": "^6.8.0",
+  "axios": "^1.3.0",
+  "socket.io-client": "^4.6.0",
+  "react-flow-renderer": "^10.3.0",
+  "@mui/material": "^5.11.0",
+  "@emotion/react": "^11.10.0",
+  "@emotion/styled": "^11.10.0",
+  "react-hook-form": "^7.43.0",
+  "recharts": "^2.5.0"
+}
+📱 PLATFORM INTEGRATIONS
+1. WHATSAPP BUSINESS
+javascript
+// WhatsApp Service
+class WhatsAppService {
+  async sendMessage(to, template, variables) {
+    return {
+      platform: 'whatsapp',
+      messageId: Date.now(),
+      status: 'sent',
+      template,
+      recipient: to
+    };
+  }
+  
+  async receiveWebhook(data) {
+    // Process incoming WhatsApp messages
+    return {
+      type: 'message',
+      from: data.from,
+      text: data.text,
+      timestamp: new Date()
+    };
+  }
+}
+2. TELEGRAM BOT
+javascript
+// Telegram Service
+class TelegramService {
+  constructor(token) {
+    this.bot = new TelegramBot(token, { polling: true });
+  }
+  
+  async sendMessage(chatId, text, options = {}) {
+    return this.bot.sendMessage(chatId, text, {
+      reply_markup: options.keyboard,
+      parse_mode: 'HTML'
+    });
+  }
+}
+3. FACEBOOK MESSENGER
+javascript
+// Messenger Service
+class MessengerService {
+  async sendMessage(psid, message) {
+    return axios.post(
+      `https://graph.facebook.com/v17.0/me/messages`,
+      {
+        recipient: { id: psid },
+        message: message
+      },
+      { params: { access_token: this.pageToken } }
+    );
+  }
+}
+4. WEB CHAT WIDGET
+javascript
+// Web Chat Widget
+const WebChatWidget = () => {
+  return `
+    <div id="botfactory-chat">
+      <iframe src="${chatUrl}" 
+              style="width: 350px; height: 500px; border: none;">
+      </iframe>
+    </div>
+  `;
+};
+🗄️ DATABASE SCHEMAS
+User Model
+javascript
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  name: { type: String, required: true },
+  company: String,
+  avatar: String,
+  subscription: {
+    plan: { type: String, enum: ['free', 'pro', 'enterprise'], default: 'free' },
+    expiresAt: Date,
+    limits: {
+      bots: { type: Number, default: 3 },
+      messages: { type: Number, default: 1000 },
+      platforms: { type: Number, default: 1 }
+    }
+  },
+  createdAt: { type: Date, default: Date.now },
+  lastLogin: Date
+});
+Bot Model
+javascript
+const botSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  description: String,
+  platform: {
+    type: String,
+    enum: ['whatsapp', 'telegram', 'messenger', 'web', 'multi'],
+    required: true
+  },
+  flow: { type: mongoose.Schema.Types.Mixed, required: true }, // JSON flow data
+  settings: {
+    welcomeMessage: String,
+    fallbackMessage: String,
+    workingHours: {
+      enabled: Boolean,
+      start: String,
+      end: String,
+      timezone: String
+    },
+    humanTakeover: Boolean
+  },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  isActive: { type: Boolean, default: true },
+  stats: {
+    totalMessages: { type: Number, default: 0 },
+    activeUsers: { type: Number, default: 0 },
+    completionRate: { type: Number, default: 0 }
+  },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: Date
+});
+Message Model
+javascript
+const messageSchema = new mongoose.Schema({
+  botId: { type: mongoose.Schema.Types.ObjectId, ref: 'Bot' },
+  userId: String, // External user ID from platform
+  platform: String,
+  direction: { type: String, enum: ['incoming', 'outgoing'] },
+  content: {
+    type: { type: String, enum: ['text', 'image', 'button', 'quick_reply'] },
+    text: String,
+    mediaUrl: String,
+    buttons: [{
+      text: String,
+      payload: String
+    }]
+  },
+  timestamp: { type: Date, default: Date.now },
+  sessionId: String
+});
+🚀 API ENDPOINTS
+Authentication
+javascript
+// POST /api/auth/register
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "secure123"
+}
+
+// POST /api/auth/login
+{
+  "email": "john@example.com",
+  "password": "secure123"
+}
+
+// Response:
+{
+  "token": "jwt_token_here",
+  "user": {
+    "id": "user_id",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "subscription": "free"
+  }
+}
+Dashboard
+javascript
+// GET /api/dashboard/stats
+Response:
+{
+  "totalMessages": 1250,
+  "totalBots": 5,
+  "activeBots": 3,
+  "monthlyMessages": 450,
+  "recentBots": [
+    {
+      "id": "bot_123",
+      "name": "Support Bot",
+      "platform": "whatsapp",
+      "messagesToday": 42,
+      "status": "active"
+    }
+  ],
+  "platformDistribution": {
+    "whatsapp": 60,
+    "telegram": 25,
+    "messenger": 10,
+    "web": 5
+  }
+}
+Bot Management
+javascript
+// POST /api/bots/create
+{
+  "name": "Customer Support Bot",
+  "platform": "whatsapp",
+  "template": "support"
+}
+
+// GET /api/bots/:id/flow
+// Returns flow JSON for editor
+
+// PUT /api/bots/:id/flow
+// Update bot flow
+
+// POST /api/bots/:id/test
+// Send test message
+🎨 VISUAL FLOW EDITOR SPECS
+Node Types
+Start Node: Conversation entry point
+
+Message Node: Send text/image/buttons
+
+Condition Node: If/Else logic based on user input
+
+API Node: Call external API
+
+Database Node: Read/write to database
+
+Delay Node: Wait X seconds/minutes
+
+Switch Node: Route based on conditions
+
+Human Handoff: Transfer to human agent
+
+End Node: Conversation end
+
+Flow JSON Structure
+json
+{
+  "nodes": [
+    {
+      "id": "start-1",
+      "type": "start",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "label": "Welcome",
+        "message": "Hello! How can I help you today?"
+      }
+    },
+    {
+      "id": "condition-1",
+      "type": "condition",
+      "position": { "x": 300, "y": 100 },
+      "data": {
+        "label": "Check User Type",
+        "conditions": [
+          { "variable": "userType", "operator": "==", "value": "new" },
+          { "variable": "userType", "operator": "==", "value": "returning" }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "start-1",
+      "target": "condition-1"
+    }
+  ]
+}
+🏠 DASHBOARD UI COMPONENTS
+1. Stats Overview
+jsx
+const StatsOverview = () => (
+  <div className="stats-grid">
+    <StatCard 
+      title="Total Messages" 
+      value="1,250" 
+      change="+12%" 
+      icon="📨"
+    />
+    <StatCard 
+      title="Active Bots" 
+      value="5" 
+      change="+2" 
+      icon="🤖"
+    />
+    <StatCard 
+      title="Platforms" 
+      value="3" 
+      icon="🌐"
+    />
+    <StatCard 
+      title="Success Rate" 
+      value="89%" 
+      change="+5%" 
+      icon="📈"
+    />
+  </div>
+);
+2. Recent Bots Table
+jsx
+const RecentBotsTable = ({ bots }) => (
+  <table>
+    <thead>
+      <tr>
+        <th>Bot Name</th>
+        <th>Platform</th>
+        <th>Status</th>
+        <th>Messages Today</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {bots.map(bot => (
+        <tr key={bot.id}>
+          <td>{bot.name}</td>
+          <td><PlatformIcon platform={bot.platform} /></td>
+          <td><StatusBadge status={bot.status} /></td>
+          <td>{bot.messagesToday}</td>
+          <td>
+            <button onClick={() => editBot(bot.id)}>Edit</button>
+            <button onClick={() => testBot(bot.id)}>Test</button>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+3. Quick Actions Panel
+jsx
+const QuickActions = () => (
+  <div className="quick-actions">
+    <h3>Quick Actions</h3>
+    <button className="primary" onClick={createNewBot}>
+      <PlusIcon /> CREATE NEW BOT
+    </button>
+    <button onClick={addPlatform}>
+      <AddIcon /> ADD PLATFORM
+    </button>
+    <button onClick={viewAnalytics}>
+      <ChartIcon /> VIEW ANALYTICS
+    </button>
+    <button onClick={inviteTeam}>
+      <UserIcon /> INVITE TEAM
+    </button>
+  </div>
+);
+🔐 AUTHENTICATION FLOW
+javascript
+// AuthContext.js
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check existing session
+    const token = localStorage.getItem('token');
+    if (token) {
+      verifyToken(token);
+    }
+    setLoading(false);
+  }, []);
+
+  const login = async (email, password) => {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    
+    const data = await response.json();
+    if (response.ok) {
+      localStorage.setItem('token', data.token);
+      setUser(data.user);
+    }
+    return data;
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+📊 ANALYTICS MODULE
+Metrics to Track
+javascript
+const analyticsMetrics = {
+  conversation: {
+    totalConversations: 0,
+    completedConversations: 0,
+    avgConversationDuration: 0,
+    dropOffPoints: []
+  },
+  user: {
+    newUsers: 0,
+    returningUsers: 0,
+    activeHours: {},
+    demographics: {}
+  },
+  bot: {
+    mostUsedFlows: [],
+    successRate: 0,
+    commonFallbacks: []
+  },
+  platform: {
+    whatsapp: { messages: 0, users: 0 },
+    telegram: { messages: 0, users: 0 },
+    messenger: { messages: 0, users: 0 },
+    web: { messages: 0, users: 0 }
+  }
+};
+🎯 REACT COMPONENT STRUCTURE
+text
+frontend/src/
+├── components/
+│   ├── dashboard/
+│   │   ├── StatsCard.js
+│   │   ├── QuickActions.js
+│   │   ├── RecentBots.js
+│   │   └── PlatformStatus.js
+│   ├── editor/
+│   │   ├── FlowCanvas.js
+│   │   ├── NodePalette.js
+│   │   ├── NodeConfig.js
+│   │   └── PreviewPanel.js
+│   ├── bots/
+│   │   ├── BotList.js
+│   │   ├── BotCard.js
+│   │   └── CreateBotForm.js
+│   └── shared/
+│       ├── Layout.js
+│       ├── Navbar.js
+│       ├── Sidebar.js
+│       └── ProtectedRoute.js
+├── pages/
+│   ├── Dashboard.js
+│   ├── Login.js
+│   ├── Signup.js
+│   ├── FlowEditor.js
+│   ├── MyBots.js
+│   ├── Analytics.js
+│   └── Settings.js
+├── context/
+│   ├── AuthContext.js
+│   ├── BotContext.js
+│   └── EditorContext.js
+├── hooks/
+│   ├── useAuth.js
+│   ├── useBots.js
+│   └── useWebSocket.js
+├── services/
+│   ├── api.js
+│   ├── whatsapp.js
+│   └── telegram.js
+└── utils/
+    ├── flowParser.js
+    └── validators.js
+🚀 DEPLOYMENT READY CONFIGURATION
+.env Example
+env
+# Backend
+PORT=3001
+MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/botfactory
+JWT_SECRET=your-super-secret-jwt-key-change-this
+NODE_ENV=production
+
+# Platform Tokens
+WHATSAPP_TOKEN=your_whatsapp_business_token
+TELEGRAM_TOKEN=your_telegram_bot_token
+FACEBOOK_PAGE_TOKEN=your_facebook_page_token
+
+# Frontend
+REACT_APP_API_URL=https://api.yourdomain.com
+REACT_APP_WS_URL=wss://api.yourdomain.com
+Docker Configuration
+dockerfile
+# backend/Dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+EXPOSE 3001
+CMD ["node", "src/server.js"]
+
+# frontend/Dockerfile
+FROM node:18-alpine as build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/build /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+🎯 MINIMUM VIABLE PRODUCT (MVP) FEATURES
+Phase 1 (Week 1)
+User authentication (Login/Register)
+
+Dashboard with mock statistics
+
+Create bot with name/platform selection
+
+Basic flow editor with 3 node types
+
+Web chat widget integration
+
+Mock WhatsApp messages
+
+Phase 2 (Week 2)
+Real database integration
+
+Actual WhatsApp API connection
+
+Advanced flow editor (all node types)
+
+Conversation history
+
+Basic analytics
+
+Phase 3 (Week 3)
+Telegram integration
+
+Facebook Messenger integration
+
+Team collaboration
+
+Advanced analytics
+
+Template marketplace
+
+💬 PROMPT FOR REPLIT AI
+"Create a complete Bot Factory application with these exact specifications:
+
+Backend: Node.js/Express API with:
+
+MongoDB using Mongoose
+
+JWT authentication
+
+Real-time Socket.io
+
+RESTful endpoints for bots, messages, analytics
+
+Platform services for WhatsApp, Telegram, Messenger
+
+Frontend: React application with:
+
+Material-UI components
+
+React Flow for visual editor
+
+React Router v6
+
+Context API for state management
+
+Real-time dashboard updates
+
+Core Features:
+
+User authentication (login/register)
+
+Dashboard with live statistics
+
+Visual bot flow editor
+
+Multi-platform bot deployment
+
+Message analytics
+
+Team collaboration
+
+File Structure exactly as specified above
+
+All API endpoints as documented
+
+Database schemas for User, Bot, Message
+
+Production-ready with error handling
+
+Start by creating the backend server with MongoDB connection, then the React frontend, then integrate them together."
+
+🔍 TESTING SCENARIOS
+User Registration: New user can create account
+
+Bot Creation: User can create bot with flow
+
+Flow Editing: User can design conversation flow visually
+
+Message Testing: User can send test messages
+
+Multi-Platform: Bot works on WhatsApp and Web
+
+Analytics: Dashboard shows real stats
+
+🎨 COLOR SCHEME & DESIGN
+css
+:root {
+  --primary: #4F46E5;    /* Indigo */
+  --secondary: #10B981;  /* Emerald */
+  --success: #22C55E;    /* Green */
+  --warning: #F59E0B;    /* Amber */
+  --danger: #EF4444;     /* Red */
+  --dark: #111827;       /* Gray-900 */
+  --light: #F9FAFB;      /* Gray-50 */
+  --sidebar: #1F2937;    /* Gray-800 */
+}
+This specification contains EVERYTHING Replit AI needs to build a production-ready, multi-platform bot builder from scratch. The AI should follow this exact structure, architecture, and feature set.
+
